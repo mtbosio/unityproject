@@ -4,24 +4,19 @@
  * data from given chunk data.
  */
 
-using System.Collections.Generic;
 using UnityEngine;
 
 public class ChunkMesh : MonoBehaviour
 {
     private ChunkData chunkData;
     private World world;
-
-    private List<Vector3> vertices = new List<Vector3>();
-    private List<int> triangles = new List<int>();
-    private List<Vector2> uvs = new List<Vector2>();
-
+    private MeshData meshData = new MeshData();
     private Mesh mesh;
 
     public void Initialize(ChunkData chunkData, World world)
     {
-        this.world = world;
         this.chunkData = chunkData;
+        this.world = world;
         GenerateMesh();
     }
 
@@ -52,168 +47,13 @@ public class ChunkMesh : MonoBehaviour
     {
         Vector3 blockPosition = new Vector3(x, y, z);
 
-        if (IsTransparent(x, y + 1, z)) AddFace(blockPosition, Vector3.up); // Top
-        if (IsTransparent(x, y - 1, z)) AddFace(blockPosition, Vector3.down); // Bottom
-        if (IsTransparent(x + 1, y, z)) AddFace(blockPosition, Vector3.right); // Right
-        if (IsTransparent(x - 1, y, z)) AddFace(blockPosition, Vector3.left); // Left
-        if (IsTransparent(x, y, z + 1)) AddFace(blockPosition, Vector3.forward); // Front
-        if (IsTransparent(x, y, z - 1)) AddFace(blockPosition, Vector3.back); // Back
-    }
-
-    private void AddFace(Vector3 position, Vector3 normal)
-    {
-        int vertexIndex = vertices.Count;
-
-        Vector3[] faceVertices = new Vector3[4];
-
-        if (normal == Vector3.up) // Top face
+        foreach (Vector3 normal in new[] { Vector3.up, Vector3.down, Vector3.right, Vector3.left, Vector3.forward, Vector3.back })
         {
-            faceVertices[0] = position + new Vector3(0, 1, 0); // Bottom-left
-            faceVertices[1] = position + new Vector3(0, 1, 1); // Top-left
-            faceVertices[2] = position + new Vector3(1, 1, 1); // Top-right
-            faceVertices[3] = position + new Vector3(1, 1, 0); // Bottom-right
-        }
-        else if (normal == Vector3.down) // Bottom face
-        {
-            faceVertices[0] = position + new Vector3(0, 0, 0); // Bottom-left
-            faceVertices[3] = position + new Vector3(1, 0, 0); // Bottom-right
-            faceVertices[2] = position + new Vector3(1, 0, 1); // Top-right
-            faceVertices[1] = position + new Vector3(0, 0, 1); // Top-left
-        }
-        else if (normal == Vector3.right) // Right face
-        {
-            faceVertices[0] = position + new Vector3(1, 0, 0); // Bottom-left
-            faceVertices[1] = position + new Vector3(1, 1, 0); // Top-left
-            faceVertices[2] = position + new Vector3(1, 1, 1); // Top-right
-            faceVertices[3] = position + new Vector3(1, 0, 1); // Bottom-right
-        }
-        else if (normal == Vector3.left) // Left face
-        {
-            faceVertices[0] = position + new Vector3(0, 0, 0); // Bottom-right
-            faceVertices[1] = position + new Vector3(0, 1, 0); // Top-right
-            faceVertices[2] = position + new Vector3(0, 1, 1); // Top-left
-            faceVertices[3] = position + new Vector3(0, 0, 1); // Bottom-left
-        }
-        else if (normal == Vector3.forward) // Front face
-        {
-            faceVertices[0] = position + new Vector3(0, 0, 1); // Bottom-left
-            faceVertices[1] = position + new Vector3(1, 0, 1); // Bottom-right
-            faceVertices[2] = position + new Vector3(1, 1, 1); // Top-right
-            faceVertices[3] = position + new Vector3(0, 1, 1); // Top-left
-        }
-        else if (normal == Vector3.back) // Back face
-        {
-            faceVertices[0] = position + new Vector3(0, 0, 0); // Bottom-right
-            faceVertices[1] = position + new Vector3(1, 0, 0); // Bottom-left
-            faceVertices[2] = position + new Vector3(1, 1, 0); // Top-left
-            faceVertices[3] = position + new Vector3(0, 1, 0); // Top-right
-        }
-
-        vertices.AddRange(faceVertices);
-
-        // Add triangles 
-        if (normal == Vector3.up || normal == Vector3.right || normal == Vector3.forward)
-        {
-            // Clockwise
-            triangles.Add(vertexIndex);
-            triangles.Add(vertexIndex + 1);
-            triangles.Add(vertexIndex + 2);
-            triangles.Add(vertexIndex);
-            triangles.Add(vertexIndex + 2);
-            triangles.Add(vertexIndex + 3);
-        }
-        else
-        {
-            // Counter-clockwise
-            triangles.Add(vertexIndex);
-            triangles.Add(vertexIndex + 3);
-            triangles.Add(vertexIndex + 2);
-            triangles.Add(vertexIndex);
-            triangles.Add(vertexIndex + 2);
-            triangles.Add(vertexIndex + 1);
-        }
-
-        // Texture Mapping
-        Block block = chunkData.GetBlockAtPosition((int)position.x, (int)position.y, (int)position.z);
-        Vector2[] faceUVs = GetUVsForBlockFace(block, normal);
-        uvs.AddRange(faceUVs);
-    }
-
-    private Vector2[] GetUVsForBlockFace(Block block, Vector3 normal)
-    {
-        Vector2[] uvs = new Vector2[4];
-
-        // Define UV coordinates based on the block type and face normal
-        if (block == Block.Grass)
-        {
-            if (normal == Vector3.up)
+            if (IsTransparent(x + (int)normal.x, y + (int)normal.y, z + (int)normal.z))
             {
-                uvs = GetUVsFromAtlas(0, 0, normal); // Grass top
-            }
-            else if (normal == Vector3.down)
-            {
-                uvs = GetUVsFromAtlas(2, 0, normal); // Dirt
-            }
-            else
-            {
-                uvs = GetUVsFromAtlas(1, 0, normal); // Grass side
+                AddFace(blockPosition, normal, block);
             }
         }
-        else if (block == Block.Dirt)
-        {
-            uvs = GetUVsFromAtlas(2, 0, normal); // Dirt
-        }
-
-
-        return uvs;
-    }
-
-    private Vector2[] GetUVsFromAtlas(int atlasX, int atlasY, Vector3 normal)
-    {
-        float texSize = 1.0f / Constants.TEXTURE_SIZE;
-        float xMin = atlasX * texSize;
-        float xMax = xMin + texSize;
-        float yMin = 0;
-        float yMax = 1;
-
-        if (normal == Vector3.left || normal == Vector3.right)
-        {
-            return new Vector2[]
-            {
-            new Vector2(xMin, yMin), // Bottom-left
-            new Vector2(xMin, yMax), // Top-left
-            new Vector2(xMax, yMax), // Top-right
-            new Vector2(xMax, yMin)  // Bottom-right
-            };
-        }
-        else if (normal == Vector3.forward || normal == Vector3.back)
-        {
-            return new Vector2[]
-            {
-            new Vector2(xMin, yMin), // Bottom-left
-            new Vector2(xMax, yMin), // Bottom-right
-            new Vector2(xMax, yMax), // Top-right
-            new Vector2(xMin, yMax)  // Top-left
-            };
-        }
-        else if (normal == Vector3.up || normal == Vector3.down)
-        {
-            return new Vector2[]
-            {
-            new Vector2(xMin, yMin), // Bottom-left
-            new Vector2(xMax, yMin), // Bottom-right
-            new Vector2(xMax, yMax), // Top-right
-            new Vector2(xMin, yMax)  // Top-left
-            };
-        }
-
-        return new Vector2[]
-        {
-        new Vector2(xMin, yMin), // Bottom-left
-        new Vector2(xMax, yMin), // Bottom-right
-        new Vector2(xMax, yMax), // Top-right
-        new Vector2(xMin, yMax)  // Top-left
-        };
     }
 
     private bool IsTransparent(int x, int y, int z)
@@ -260,6 +100,35 @@ public class ChunkMesh : MonoBehaviour
         return neighborChunk.GetBlockAtPosition(neighborPosition.x, neighborPosition.y, neighborPosition.z);
     }
 
+    private void AddFace(Vector3 position, Vector3 normal, Block block)
+    {
+        Vector3[] vertices = FaceBuilder.GetFaceVertices(position, normal);
+        int[] triangles = FaceBuilder.GetTriangleIndices(clockwise: normal == Vector3.up || normal == Vector3.right || normal == Vector3.forward);
+        Vector2[] uvs = new Vector2[4];
+
+        if (block == Block.Grass)
+        {
+            if (normal == Vector3.up)
+            {
+                uvs = TextureAtlas.GetUVs(0, 0, normal); // Grass top
+            }
+            else if (normal == Vector3.down)
+            {
+                uvs = TextureAtlas.GetUVs(2, 0, normal); // Dirt
+            }
+            else
+            {
+                uvs = TextureAtlas.GetUVs(1, 0, normal); // Grass side
+            }
+        }
+        else if (block == Block.Dirt)
+        {
+            uvs = TextureAtlas.GetUVs(2, 0, normal); // Dirt
+        }
+
+        meshData.AddQuad(vertices, triangles, uvs);
+    }
+
     private void BuildMesh()
     {
         if (mesh == null)
@@ -269,9 +138,9 @@ public class ChunkMesh : MonoBehaviour
         }
 
         mesh.Clear();
-        mesh.vertices = vertices.ToArray();
-        mesh.triangles = triangles.ToArray();
-        mesh.uv = uvs.ToArray();
+        mesh.vertices = meshData.Vertices.ToArray();
+        mesh.triangles = meshData.Triangles.ToArray();
+        mesh.uv = meshData.UVs.ToArray();
         mesh.RecalculateNormals();
     }
 }
