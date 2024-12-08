@@ -1,5 +1,5 @@
 /**
- * Holds all data for a chunk including its world position, its blocks, and likely its neighboring chunks. Also 
+ * Holds all data for a chunk including its world position and its blocks. Also 
  * uses Perlin Noise to generate terrain. Will likely switch to Simplex or Gradient Noise eventually.
  */
 

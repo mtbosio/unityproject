@@ -10,11 +10,12 @@ public static class TextureAtlas
 {
     public static Vector2[] GetUVs(int atlasX, int atlasY, Vector3 normal)
     {
-        float texSize = 1.0f / Constants.TEXTURE_SIZE;
-        float xMin = atlasX * texSize;
-        float xMax = xMin + texSize;
-        float yMin = 0;
-        float yMax = 1;
+        float horizontalTexSize = 1.0f / Constants.HORIZONTAL_TEXTURE_SIZE;
+        float verticalTexSize = 1.0f / Constants.VERTICAL_TEXTURE_SIZE;
+        float xMin = atlasX * horizontalTexSize;
+        float xMax = xMin + horizontalTexSize;
+        float yMin = atlasY * verticalTexSize;
+        float yMax = yMin + verticalTexSize;
         if (normal == Vector3.left || normal == Vector3.right)
         {
             return new Vector2[]
