@@ -1,3 +1,4 @@
+
 /**
  * Keeps track of vertices, indices, and uv coords for a chunk. Also generates chunk mesh
  * data from given chunk data.
@@ -9,6 +10,7 @@ using UnityEngine;
 public class ChunkMesh : MonoBehaviour
 {
     private ChunkData chunkData;
+    private World world;
 
     private List<Vector3> vertices = new List<Vector3>();
     private List<int> triangles = new List<int>();
@@ -16,8 +18,9 @@ public class ChunkMesh : MonoBehaviour
 
     private Mesh mesh;
 
-    public void Initialize(ChunkData chunkData)
+    public void Initialize(ChunkData chunkData, World world)
     {
+        this.world = world;
         this.chunkData = chunkData;
         GenerateMesh();
     }
@@ -130,21 +133,131 @@ public class ChunkMesh : MonoBehaviour
             triangles.Add(vertexIndex + 1);
         }
 
-        // Add UVs for texture mapping. These are dummys for now
-        uvs.Add(new Vector2(0, 0));
-        uvs.Add(new Vector2(1, 0));
-        uvs.Add(new Vector2(1, 1));
-        uvs.Add(new Vector2(0, 1));
+        // Texture Mapping
+        Block block = chunkData.GetBlockAtPosition((int)position.x, (int)position.y, (int)position.z);
+        Vector2[] faceUVs = GetUVsForBlockFace(block, normal);
+        uvs.AddRange(faceUVs);
     }
 
+    private Vector2[] GetUVsForBlockFace(Block block, Vector3 normal)
+    {
+        Vector2[] uvs = new Vector2[4];
+
+        // Define UV coordinates based on the block type and face normal
+        if (block == Block.Grass)
+        {
+            if (normal == Vector3.up)
+            {
+                uvs = GetUVsFromAtlas(0, 0, normal); // Grass top
+            }
+            else if (normal == Vector3.down)
+            {
+                uvs = GetUVsFromAtlas(2, 0, normal); // Dirt
+            }
+            else
+            {
+                uvs = GetUVsFromAtlas(1, 0, normal); // Grass side
+            }
+        }
+        else if (block == Block.Dirt)
+        {
+            uvs = GetUVsFromAtlas(2, 0, normal); // Dirt
+        }
+
+
+        return uvs;
+    }
+
+    private Vector2[] GetUVsFromAtlas(int atlasX, int atlasY, Vector3 normal)
+    {
+        float texSize = 1.0f / Constants.TEXTURE_SIZE;
+        float xMin = atlasX * texSize;
+        float xMax = xMin + texSize;
+        float yMin = 0;
+        float yMax = 1;
+
+        if (normal == Vector3.left || normal == Vector3.right)
+        {
+            return new Vector2[]
+            {
+            new Vector2(xMin, yMin), // Bottom-left
+            new Vector2(xMin, yMax), // Top-left
+            new Vector2(xMax, yMax), // Top-right
+            new Vector2(xMax, yMin)  // Bottom-right
+            };
+        }
+        else if (normal == Vector3.forward || normal == Vector3.back)
+        {
+            return new Vector2[]
+            {
+            new Vector2(xMin, yMin), // Bottom-left
+            new Vector2(xMax, yMin), // Bottom-right
+            new Vector2(xMax, yMax), // Top-right
+            new Vector2(xMin, yMax)  // Top-left
+            };
+        }
+        else if (normal == Vector3.up || normal == Vector3.down)
+        {
+            return new Vector2[]
+            {
+            new Vector2(xMin, yMin), // Bottom-left
+            new Vector2(xMax, yMin), // Bottom-right
+            new Vector2(xMax, yMax), // Top-right
+            new Vector2(xMin, yMax)  // Top-left
+            };
+        }
+
+        return new Vector2[]
+        {
+        new Vector2(xMin, yMin), // Bottom-left
+        new Vector2(xMax, yMin), // Bottom-right
+        new Vector2(xMax, yMax), // Top-right
+        new Vector2(xMin, yMax)  // Top-left
+        };
+    }
 
     private bool IsTransparent(int x, int y, int z)
     {
-        
-        if (x < 0 || x >= Constants.CHUNK_SIZE || y < 0 || y >= Constants.CHUNK_SIZE || z < 0 || z >= Constants.CHUNK_SIZE)
-            return false;
+        if (x < 0 || x >= Constants.CHUNK_SIZE ||
+            y < 0 || y >= Constants.CHUNK_SIZE ||
+            z < 0 || z >= Constants.CHUNK_SIZE)
+        {
+            return GetNeighborBlock(x, y, z) == Block.Air;
+        }
 
-        return !chunkData.GetBlockAtPosition(x, y, z).IsSolid;
+        return chunkData.GetBlockAtPosition(x, y, z) == Block.Air;
+    }
+
+    private Block GetNeighborBlock(int x, int y, int z)
+    {
+        Vector3Int neighborOffset = new Vector3Int(
+            x < 0 ? -1 * Constants.CHUNK_SIZE : x >= Constants.CHUNK_SIZE ? Constants.CHUNK_SIZE : 0,
+            y < 0 ? -1 * Constants.CHUNK_SIZE : y >= Constants.CHUNK_SIZE ? Constants.CHUNK_SIZE : 0,
+            z < 0 ? -1 * Constants.CHUNK_SIZE : z >= Constants.CHUNK_SIZE ? Constants.CHUNK_SIZE : 0
+        );
+
+        if (neighborOffset == Vector3Int.zero)
+            return Block.Air;
+
+        Vector3Int neighborChunkPosition = new Vector3Int(
+            chunkData.GetWorldX() + neighborOffset.x,
+            chunkData.GetWorldY() + neighborOffset.y,
+            chunkData.GetWorldZ() + neighborOffset.z
+        );
+
+        ChunkData neighborChunk = world.GetChunk(neighborChunkPosition);
+        if (neighborChunk == null)
+        {
+            return Block.Air; // Assume air if neighbor chunk doesn't exist
+        }
+
+        Vector3Int neighborPosition = new Vector3Int(
+            x < 0 ? Constants.CHUNK_SIZE - 1 : x % Constants.CHUNK_SIZE,
+            y < 0 ? Constants.CHUNK_SIZE - 1 : y % Constants.CHUNK_SIZE,
+            z < 0 ? Constants.CHUNK_SIZE - 1 : z % Constants.CHUNK_SIZE
+        );
+
+        return neighborChunk.GetBlockAtPosition(neighborPosition.x, neighborPosition.y, neighborPosition.z);
     }
 
     private void BuildMesh()
